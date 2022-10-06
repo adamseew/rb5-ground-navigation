@@ -2,7 +2,9 @@
 #include "../include/pose_pub.hpp"
 
 #include <iostream>
-#include <fstream>
+#include <unistd.h>
+#include <signal.h>
+#include <cstdlib>
 
 using namespace ytcg;
 
@@ -14,10 +16,6 @@ PosePub::PosePub(void) {
 
 PosePub::~PosePub(void) { } 
 
-#ifdef LOG_POSE
-    static std::ofstream file;
-#endif
-
 void PosePub::topic_callback(const geometry_msgs::Pose::ConstPtr& _pose) {
 	
     static size_t _count = 0;
@@ -25,7 +23,7 @@ void PosePub::topic_callback(const geometry_msgs::Pose::ConstPtr& _pose) {
     
     if (_count++ == 0) {
 #ifdef LOG_POSE
-        file.open(LOG_POSE_FILE, std::ios::app);
+	__LOG_POSE::file().open(LOG_POSE_FILE, std::ios::app);
 	ROS_INFO_STREAM("logging enabled, check file " << LOG_POSE_FILE);
 #endif
         ROS_INFO_STREAM("callback " << _pose << " from topic " ORBSLAM_FRAMES_TOPIC);
@@ -38,24 +36,31 @@ void PosePub::topic_callback(const geometry_msgs::Pose::ConstPtr& _pose) {
                    );
 #ifdef LOG_POSE
     snprintf(buffer, sizeof(buffer), "%f,%f,%f", _pose->position.x, _pose->position.y, _pose->position.z);
-    file << buffer << std::endl;
+    __LOG_POSE::file() << buffer << std::endl;
 #endif
 }
 
+void signal_callback_handler(int signum) {
+#ifdef LOG_POSE
+    __LOG_POSE::file().close();
+    ROS_INFO_STREAM(LOG_POSE_FILE << " closed");
+#endif
+    ROS_INFO("pose publisher node terminating");
+    ros::shutdown();
+}
+
 int main(int argc, char ** argv) {
+    
+    // making sure the log file is closed w/ abrupt termiantion
+    signal(SIGINT, signal_callback_handler);
 
     ROS_INFO("started pose publisher node");
-    ros::init(argc, argv, NODE_POSE_PUB);
+    ros::init(argc, argv, NODE_POSE_PUB, ros::init_options::NoSigintHandler);
     ROS_INFO("initialized pose publisher node");
 
     auto pp = new PosePub();
     ros::spin();
-#ifdef LOG_POSE
-    file.close();
-    ROS_INFO_STREAM(LOG_POSE_FILE << " ready");
-#endif
-
-    ROS_INFO("pose publisher node terminated");
+    
     return 0;
 }
 

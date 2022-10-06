@@ -1,6 +1,7 @@
 
 #include <geometry_msgs/Pose.h>
 #include <ros/ros.h>
+#include <fstream>
 
 #ifndef YTCG_POSE_PUB_HPP
 #define YTCG_POSE_PUB_HPP
@@ -12,6 +13,15 @@
 #define LOG_POSE_FILE        "log_pose.dat"
 
 namespace ytcg {
+
+#ifdef LOG_POSE
+    struct __LOG_POSE {
+        static std::ofstream& file() { 
+            static std::ofstream __file;
+            return __file;
+        }
+    };
+#endif
 
     class PosePub {
 

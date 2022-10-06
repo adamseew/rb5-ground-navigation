@@ -30,7 +30,10 @@ set(LIBS
 )
 
 add_executable(pose_publisher_node src/pose_pub.cpp)
+add_executable(pointcloud_depth_wrapper src/pcd_wrapper.cpp)
 add_dependencies(pose_publisher_node ${catkin_EXPORTED_TARGETS})
+add_dependencies(pointcloud_depth_wrapper ${catkin_EXPORTED_TARGETS})
 target_link_libraries(pose_publisher_node ${LIBS})
+target_link_libraries(pointcloud_depth_wrapper ${LIBS})
 
 
