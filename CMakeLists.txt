@@ -12,6 +12,8 @@ find_package(catkin REQUIRED COMPONENTS
   cv_bridge
 )
 
+find_package(Boost COMPONENTS filesystem regex REQUIRED)
+
 find_package(OpenCV REQUIRED)
 
 # define catkin package
@@ -27,6 +29,7 @@ include_directories(
 set(LIBS
    ${catkin_LIBRARIES}
    ${OpenCV_LIBS}
+   ${Boost_LIBRARIES}
 )
 
 add_executable(pose_publisher_node src/pose_pub.cpp)
