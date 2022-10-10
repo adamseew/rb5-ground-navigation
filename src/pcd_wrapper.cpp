@@ -4,10 +4,12 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/range/adaptors.hpp>
 #include <boost/filesystem.hpp>
+#include <stdexcept>
 #include <iostream>
+#include <cstdlib>
 #include <fstream>
 #include <string>
-#include <vector>
+#include <cmath>
 
 #define BOOST_RANGE_ENABLE_CONCEPT_ASSERT 0
 
@@ -26,14 +28,42 @@ PCDWrapper::PCDWrapper(void) {
 
 PCDWrapper::~PCDWrapper(void) { } 
 
+auto PCDWrapper::_longest_distance(vector<Point3D>& _pcd) {
+
+    int     i         = 1;
+    double  distance  = std::abs(_pcd.at(0).x-_pcd.at(1).x),
+            __distance__;
+    Point3D ld_point1 = _pcd.at(0),
+            ld_point2 = _pcd.at(1);
+    
+    struct __return {         
+        double __1;
+        Point3D __2, __3;
+    };
+
+    std::sort(_pcd.begin(), _pcd.end());
+
+    for ( ; i+1 < _pcd.size(); i++) {
+        __distance__ = std::abs(_pcd.at(i).x-_pcd.at(i+1).x);
+        if (__distance__ > distance) {
+            ld_point1 = _pcd.at(i);
+            ld_point2 = _pcd.at(i+1);
+            distance = __distance__;
+        }
+    }
+    return __return{distance, ld_point1, ld_point2};
+}
+
 void PCDWrapper::timer_callback(const ros::TimerEvent& _event) {
 	
-    static std::vector<PointCloud> pcd;
-    static size_t                  _count   = 0;
-    static size_t                  _hash    = 0;
-    size_t                         __hash__ = 0;
-    int                            i;
-    std::string                    line, raw_data;
+    static vector<Point3D> pcd;
+    static size_t          _count   = 0;
+    static size_t          _hash    = 0;
+    size_t                 __hash__ = 0,
+                           _size;
+    int                    i;
+    std::string            line,
+                           raw_data;
 
     if (_count++ == 0) {
         ROS_INFO("callback from timer");
@@ -59,20 +89,57 @@ void PCDWrapper::timer_callback(const ros::TimerEvent& _event) {
 	std::getline(pcd_file, raw_data); // all the data are just in the first line
 	pcd_file.close();
 
-	// ROS_INFO_STREAM("debug 1 " << raw_data);
-
 	boost::split(__raw_data__, raw_data, boost::is_any_of(","));
 
 	pcd.clear();
 	for (i = 0; i+2 < __raw_data__.size(); i += 3) {
-            pcd.push_back(PointCloud(std::atof(__raw_data__.at(i).c_str()),
-                                     std::atof(__raw_data__.at(i+1).c_str()),
-                                     std::atof(__raw_data__.at(i+2).c_str())));
-	    ROS_INFO_STREAM("pcd data " << i/3 << " is " << pcd.back().z << ", " << pcd.back().y << ", " << pcd.back().z);
+            pcd.push_back(Point3D(std::atof(__raw_data__.at(i).c_str()),
+                                  std::atof(__raw_data__.at(i+1).c_str()),
+                                  std::atof(__raw_data__.at(i+2).c_str())));
+	    ROS_INFO_STREAM("pcd data " << i/3 << " is " << pcd.back().x << ", " << pcd.back().y << ", " << pcd.back().z);
 	}
 
 	_hash = __hash__;
+	
+	// filtering the restults, i.e., removing points that are above rocker bogie...
+	_size = pcd.size();
+        _filter(Filter::height, pcd);
+	ROS_INFO_STREAM("pcd size before filtering height " << _size << ", after " << pcd.size());
+	_filter(Filter::distance, pcd);
+	ROS_INFO_STREAM("pcd size after filtering distance " << pcd.size());
+	_filter(Filter::duplicates, pcd);
+	ROS_INFO_STREAM("pcd size after filtering duplicates " << pcd.size());
+
+        // finding the two points with the longest possible distance
+	auto [distance, ld_point1, ld_point2] = _longest_distance(pcd);
+        ROS_INFO_STREAM("pcd points with the highest distance (" << distance << "), are " 
+                        << ld_point1.x << ", " << ld_point1.y << ", " << ld_point1.z <<  " and "
+                        << ld_point2.x << ", " << ld_point2.y << ", " << ld_point2.z
+                       );
+
     }
+}
+
+void PCDWrapper::_filter(const Filter __filter, vector<Point3D>& _pcd) {
+
+    if (__filter == Filter::height) {
+        _pcd.erase(std::remove_if(_pcd.begin(), _pcd.end(), [](Point3D& point) { 
+                                      return std::abs(point.z) > ROCKER_BOGIE_MAX_HEIGHT;
+				  }
+				 ), _pcd.end());
+	return;
+    } else if (__filter == Filter::distance) {
+        _pcd.erase(std::remove_if(_pcd.begin(), _pcd.end(), [](Point3D point) {
+                                      return sqrt(pow(point.x, 2)+pow(point.y, 2)+pow(point.z, 2)) > POINT_MAX_DISTANCE;
+                                  }
+                                 ), _pcd.end());
+	return;
+    } else if (__filter == Filter::duplicates) {
+        _pcd.erase(std::unique(_pcd.begin(), _pcd.end()), _pcd.end());
+        return;
+    }
+    
+    throw std::logic_error("filter not yet implemented");   
 }
 
 int main(int argc, char ** argv) {
