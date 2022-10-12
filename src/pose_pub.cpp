@@ -1,6 +1,7 @@
 
 #include "../include/pose_pub.hpp"
 
+#include <functional>
 #include <iostream>
 #include <unistd.h>
 #include <signal.h>
@@ -9,7 +10,7 @@
 using namespace ytcg;
 
 PosePub::PosePub(void) {
-    subscription_ = handler_.subscribe(ORBSLAM_FRAMES_TOPIC, 1000, topic_callback);
+    subscription_ = handler_.subscribe<geometry_msgs::Pose>(ORBSLAM_FRAMES_TOPIC, 1000, std::bind(&PosePub::topic_callback, this, std::placeholders::_1));
 
     ROS_INFO_STREAM("pose publisher node subscribed to topic " << ORBSLAM_FRAMES_TOPIC);
 }

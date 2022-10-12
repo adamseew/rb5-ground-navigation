@@ -4,6 +4,7 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/range/adaptors.hpp>
 #include <boost/filesystem.hpp>
+#include <functional>
 #include <stdexcept>
 #include <iostream>
 #include <cstdlib>
@@ -22,8 +23,11 @@ using std::vector;
 using std::time_t;
 
 PCDWrapper::PCDWrapper(void) {
-    timer_ = handler_.createTimer(ros::Duration(PCD_FREQ), timer_callback);
+    timer_ = handler_.createTimer(ros::Duration(PCD_FREQ), std::bind(&PCDWrapper::timer_callback, this, std::placeholders::_1));
     ROS_INFO_STREAM("pointcloud depth wrapper node subscribed to timer, triggering each " << std::to_string(PCD_FREQ) << " secs");
+    _publisher  = handler_.advertise<geometry_msgs::Point>(LONGEST_DISTANCE_POINT1_TOPIC, 1);
+    __publisher = handler_.advertise<geometry_msgs::Point>(LONGEST_DISTANCE_POINT2_TOPIC, 1);
+    ROS_INFO_STREAM("initialized topics " << LONGEST_DISTANCE_POINT1_TOPIC << ", " << LONGEST_DISTANCE_POINT2_TOPIC);
 }
 
 PCDWrapper::~PCDWrapper(void) { } 
@@ -55,7 +59,7 @@ auto PCDWrapper::_longest_distance(vector<Point3D>& _pcd) {
 }
 
 void PCDWrapper::timer_callback(const ros::TimerEvent& _event) {
-	
+
     static vector<Point3D> pcd;
     static size_t          _count   = 0;
     static size_t          _hash    = 0;
@@ -78,7 +82,7 @@ void PCDWrapper::timer_callback(const ros::TimerEvent& _event) {
                         return _path.filename().string().rfind("isdf_pcd_", 0) == 0; 
                       })
         ) {
-	entries.push_back(entry.path().filename().string());
+        entries.push_back(entry.path().filename().string());
     }
 
     sort(entries.begin(), entries.end());
@@ -86,34 +90,43 @@ void PCDWrapper::timer_callback(const ros::TimerEvent& _event) {
     if ((__hash__ = std::hash<std::string>{}(entries.back())) != _hash) {
         ROS_INFO_STREAM("detected new pcd " << entries.back() << ", " << __hash__);
         std::ifstream pcd_file(std::string(PCD_FOLDER) + "/" + entries.back());
-	std::getline(pcd_file, raw_data); // all the data are just in the first line
-	pcd_file.close();
+        std::getline(pcd_file, raw_data); // all the data are just in the first line
+        pcd_file.close();
 
-	boost::split(__raw_data__, raw_data, boost::is_any_of(","));
+        boost::split(__raw_data__, raw_data, boost::is_any_of(","));
 
-	pcd.clear();
-	for (i = 0; i+2 < __raw_data__.size(); i += 3) // {
+        pcd.clear();
+        for (i = 0; i+2 < __raw_data__.size(); i += 3) // {
             pcd.push_back(Point3D(std::atof(__raw_data__.at(i).c_str()),
                                   std::atof(__raw_data__.at(i+1).c_str()),
                                   std::atof(__raw_data__.at(i+2).c_str())));
-	    // ROS_INFO_STREAM("pcd data " << i/3 << " is " << pcd.back().x << ", " << pcd.back().y << ", " << pcd.back().z);
-	// }
+            // ROS_INFO_STREAM("pcd data " << i/3 << " is " << pcd.back().x << ", " << pcd.back().y << ", " << pcd.back().z);
+        // }
 
-	_hash = __hash__;
-	
-	// filtering the restults, i.e., removing points that are above rocker bogie...
-	_size = pcd.size();
+        _hash = __hash__;
+
+        // filtering the restults, i.e., removing points that are above rocker bogie...
+        _size = pcd.size();
         _filter(Filter::height|Filter::distance|Filter::duplicates, pcd);
-	ROS_INFO_STREAM("pcd size before filtering " << _size << ", after " << pcd.size());
+        ROS_INFO_STREAM("pcd size before filtering " << _size << ", after " << pcd.size());
 
         // finding the two points with the longest possible distance
-	auto [distance, ld_point1, ld_point2] = _longest_distance(pcd);
+        auto [distance, ld_point1, ld_point2] = _longest_distance(pcd);
         ROS_INFO_STREAM("pcd points with the highest distance (" << distance << "), are " 
                         << ld_point1.x << ", " << ld_point1.y << ", " << ld_point1.z <<  " and "
                         << ld_point2.x << ", " << ld_point2.y << ", " << ld_point2.z
                        );
-	// todo from here
+        auto ros_point = [](Point3D& point) -> geometry_msgs::Point {
+            geometry_msgs::Point _ros_point;
+            _ros_point.x = point.x;
+            _ros_point.y = point.y;
+            _ros_point.z = point.z;
+            return _ros_point;
+        };
 
+        _publisher.publish(ros_point(ld_point1));
+        __publisher.publish(ros_point(ld_point2));
+	ROS_INFO("points with highest distance are now published");
     }
 }
 
@@ -128,16 +141,17 @@ void PCDWrapper::_filter(const Filter __filter, vector<Point3D>& _pcd) {
     
     if (string__filter[1] == '1' || string__filter[3] == '1') {
         _pcd.erase(std::remove_if(_pcd.begin(), _pcd.end(), [&_1_3_filter, &string__filter](Point3D& point) { 
-                                     return _1_3_filter(point, string__filter[1] == '1', string__filter[3] == '1');
-				  }
-                                 ), _pcd.end());
+                                      return _1_3_filter(point, string__filter[1] == '1', string__filter[3] == '1');
+                                  }
+                                 ), _pcd.end()
+                  );
         string__filter[1] = '0';
         string__filter[3] = '0';
     } 
 
     if (string__filter[0] == '1') {
         _pcd.erase(std::unique(_pcd.begin(), _pcd.end()), _pcd.end());
-	string__filter[0] = '0';
+        string__filter[0] = '0';
     }
 
     if (string__filter != "0000") {

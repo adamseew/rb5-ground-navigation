@@ -30,7 +30,7 @@ namespace ytcg {
 	~PosePub(void);
 
     private:
-	static void topic_callback(const geometry_msgs::Pose::ConstPtr&);
+	void topic_callback(const geometry_msgs::Pose::ConstPtr&);
 
 	ros::Subscriber subscription_;
 	ros::NodeHandle handler_;
