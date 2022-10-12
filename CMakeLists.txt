@@ -32,6 +32,8 @@ set(LIBS
    ${Boost_LIBRARIES}
 )
 
+set(CMAKE_CXX_FLAGS "-fpermissive")
+
 add_executable(pose_publisher_node src/pose_pub.cpp)
 add_executable(pointcloud_depth_wrapper src/pcd_wrapper.cpp)
 add_dependencies(pose_publisher_node ${catkin_EXPORTED_TARGETS})

@@ -28,10 +28,10 @@ namespace ytcg {
     };
 
     enum Filter { 
-        height =        1, // filters datapoints that are higher than the robot
-        voxel =         2, // voxel filtering algorithm
-	distance =      3, // removes points that are further than a given distance
-	duplicates =    4,  // removes duplicates
+        height =     0b0001, // filters datapoints that are higher than the robot
+        voxel =      0b0010, // voxel filtering algorithm
+	distance =   0b0100, // removes points that are further than a given distance
+	duplicates = 0b1000, // removes duplicates
     };
 
     class PCDWrapper {

@@ -23,7 +23,7 @@ using std::time_t;
 
 PCDWrapper::PCDWrapper(void) {
     timer_ = handler_.createTimer(ros::Duration(PCD_FREQ), timer_callback);
-    ROS_INFO_STREAM("pointcloud depth wrapper subscribed to timer, triggering each " << std::to_string(PCD_FREQ) << " secs");
+    ROS_INFO_STREAM("pointcloud depth wrapper node subscribed to timer, triggering each " << std::to_string(PCD_FREQ) << " secs");
 }
 
 PCDWrapper::~PCDWrapper(void) { } 
@@ -92,23 +92,19 @@ void PCDWrapper::timer_callback(const ros::TimerEvent& _event) {
 	boost::split(__raw_data__, raw_data, boost::is_any_of(","));
 
 	pcd.clear();
-	for (i = 0; i+2 < __raw_data__.size(); i += 3) {
+	for (i = 0; i+2 < __raw_data__.size(); i += 3) // {
             pcd.push_back(Point3D(std::atof(__raw_data__.at(i).c_str()),
                                   std::atof(__raw_data__.at(i+1).c_str()),
                                   std::atof(__raw_data__.at(i+2).c_str())));
-	    ROS_INFO_STREAM("pcd data " << i/3 << " is " << pcd.back().x << ", " << pcd.back().y << ", " << pcd.back().z);
-	}
+	    // ROS_INFO_STREAM("pcd data " << i/3 << " is " << pcd.back().x << ", " << pcd.back().y << ", " << pcd.back().z);
+	// }
 
 	_hash = __hash__;
 	
 	// filtering the restults, i.e., removing points that are above rocker bogie...
 	_size = pcd.size();
-        _filter(Filter::height, pcd);
-	ROS_INFO_STREAM("pcd size before filtering height " << _size << ", after " << pcd.size());
-	_filter(Filter::distance, pcd);
-	ROS_INFO_STREAM("pcd size after filtering distance " << pcd.size());
-	_filter(Filter::duplicates, pcd);
-	ROS_INFO_STREAM("pcd size after filtering duplicates " << pcd.size());
+        _filter(Filter::height|Filter::distance|Filter::duplicates, pcd);
+	ROS_INFO_STREAM("pcd size before filtering " << _size << ", after " << pcd.size());
 
         // finding the two points with the longest possible distance
 	auto [distance, ld_point1, ld_point2] = _longest_distance(pcd);
@@ -116,38 +112,45 @@ void PCDWrapper::timer_callback(const ros::TimerEvent& _event) {
                         << ld_point1.x << ", " << ld_point1.y << ", " << ld_point1.z <<  " and "
                         << ld_point2.x << ", " << ld_point2.y << ", " << ld_point2.z
                        );
+	// todo from here
 
     }
 }
 
 void PCDWrapper::_filter(const Filter __filter, vector<Point3D>& _pcd) {
 
-    if (__filter == Filter::height) {
-        _pcd.erase(std::remove_if(_pcd.begin(), _pcd.end(), [](Point3D& point) { 
-                                      return std::abs(point.z) > ROCKER_BOGIE_MAX_HEIGHT;
-				  }
-				 ), _pcd.end());
-	return;
-    } else if (__filter == Filter::distance) {
-        _pcd.erase(std::remove_if(_pcd.begin(), _pcd.end(), [](Point3D point) {
-                                      return sqrt(pow(point.x, 2)+pow(point.y, 2)+pow(point.z, 2)) > POINT_MAX_DISTANCE;
-                                  }
-                                 ), _pcd.end());
-	return;
-    } else if (__filter == Filter::duplicates) {
-        _pcd.erase(std::unique(_pcd.begin(), _pcd.end()), _pcd.end());
-        return;
-    }
+    auto _1_3_filter = [](Point3D& point, bool _1_filter, bool _3_filter) -> 
+        bool { 
+            return _1_filter*(std::abs(point.z) > ROCKER_BOGIE_MAX_HEIGHT) ||
+                   _3_filter*(sqrt(pow(point.x, 2)+pow(point.y, 2)+pow(point.z, 2)) > POINT_MAX_DISTANCE);
+        };
+    string string__filter = std::bitset<4>(__filter).to_string();
     
-    throw std::logic_error("filter not yet implemented");   
+    if (string__filter[1] == '1' || string__filter[3] == '1') {
+        _pcd.erase(std::remove_if(_pcd.begin(), _pcd.end(), [&_1_3_filter, &string__filter](Point3D& point) { 
+                                     return _1_3_filter(point, string__filter[1] == '1', string__filter[3] == '1');
+				  }
+                                 ), _pcd.end());
+        string__filter[1] = '0';
+        string__filter[3] = '0';
+    } 
+
+    if (string__filter[0] == '1') {
+        _pcd.erase(std::unique(_pcd.begin(), _pcd.end()), _pcd.end());
+	string__filter[0] = '0';
+    }
+
+    if (string__filter != "0000") {
+        throw std::logic_error("filter not yet implemented");   
+    }
 }
 
 int main(int argc, char ** argv) {
     
-    ROS_INFO("started pointcloud wrapper node");
+    ROS_INFO("started pointcloud depth wrapper node");
     ros::init(argc, argv, NODE_PCD_WRAPPER);
 
-    ROS_INFO("initialized pose publisher node");
+    ROS_INFO("initialized pointcloud depth wrapper node");
 
     auto pc = new PCDWrapper();
     ros::spin();
