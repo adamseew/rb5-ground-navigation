@@ -1,0 +1,35 @@
+
+# use  configuration to  export the two points
+# where the gap is, i.e.,  the two points with
+# the longest distance from point cloud depth,
+# in ROS2
+#
+# to run call: 
+#   rosparam load bridge.yaml
+# before:
+#   ros2 run ros1_bridge param_bridge
+#
+
+topics:
+  -
+    topic: /pointcloud_depth_wrapper/ld_point1 
+    type: geometry_msgs/msg/Point  
+    queue_size: 1
+    qos:
+      history: keep_all
+      durability: transient_local
+  -
+    topic: /pointcloud_depth_wrapper/ld_point2
+    type: geometry_msgs/msg/Point
+    queue_size: 1
+    qos:
+      history: keep_all
+      durability: transient_local
+  -
+    topic: /orb_slam3_ros_wrapper/pose
+    type: geometry_msgs/msg/Pose
+    queue_size: 1
+    qos:
+      history: keep_all
+      durability: transient_local
+
