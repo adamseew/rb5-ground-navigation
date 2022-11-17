@@ -12,7 +12,7 @@
 
 #define ROCKER_BOGIE_MAX_HEIGHT       1.3
 #define ROCKER_BOGIE_MIN_WIDTH        0.8
-#define POINT_MAX_DISTANCE            1.5
+#define POINT_MAX_DISTANCE            1.2
 
 #define LONGEST_DISTANCE_POINT1_TOPIC "/pointcloud_depth_wrapper/ld_point1"
 #define LONGEST_DISTANCE_POINT2_TOPIC "/pointcloud_depth_wrapper/ld_point2"

@@ -35,7 +35,7 @@ PCDWrapper::~PCDWrapper(void) { }
 auto PCDWrapper::_longest_distance(vector<Point3D>& _pcd) {
 
     int     i         = 1;
-    double  distance  = std::abs(_pcd.at(0).x-_pcd.at(1).x),
+    double  distance,
             __distance__;
     Point3D ld_point1 = _pcd.at(0),
             ld_point2 = _pcd.at(1);
@@ -46,6 +46,7 @@ auto PCDWrapper::_longest_distance(vector<Point3D>& _pcd) {
     };
 
     std::sort(_pcd.begin(), _pcd.end());
+    distance = std::abs(_pcd.at(0).x-_pcd.at(1).x);
 
     for ( ; i+1 < _pcd.size(); i++) {
         __distance__ = std::abs(_pcd.at(i).x-_pcd.at(i+1).x);
@@ -111,7 +112,11 @@ void PCDWrapper::timer_callback(const ros::TimerEvent& _event) {
         ROS_INFO_STREAM("pcd size before filtering " << _size << ", after " << pcd.size());
 
         // finding the two points with the longest possible distance
-        auto [distance, ld_point1, ld_point2] = _longest_distance(pcd);
+	if (pcd.size() < 2) {
+            ROS_WARN("not enough points after filtering to find the logest distance");
+	    return;
+	}
+	auto [distance, ld_point1, ld_point2] = _longest_distance(pcd);
         ROS_INFO_STREAM("pcd points with the highest distance (" << distance << "), are " 
                         << ld_point1.x << ", " << ld_point1.y << ", " << ld_point1.z <<  " and "
                         << ld_point2.x << ", " << ld_point2.y << ", " << ld_point2.z
