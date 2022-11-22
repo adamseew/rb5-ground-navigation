@@ -17,6 +17,10 @@
 #define LONGEST_DISTANCE_POINT1_TOPIC "/pointcloud_depth_wrapper/ld_point1"
 #define LONGEST_DISTANCE_POINT2_TOPIC "/pointcloud_depth_wrapper/ld_point2"
 
+#define MAX_FOV_REALSENSE_X           0.55
+#define MAX_FOV_REALSENSE_Z           1.06653645
+
+
 namespace ytcg {
 
     struct Point3D {
@@ -32,10 +36,11 @@ namespace ytcg {
     };
 
     enum Filter { 
-        height =     0b0001, // filters datapoints that are higher than the robot
-        voxel =      0b0010, // voxel filtering algorithm
-        distance =   0b0100, // removes points that are further than a given distance
-        duplicates = 0b1000, // removes duplicates
+        height =     0b00001, // filters datapoints that are higher than the robot
+        voxel =      0b00010, // voxel filtering algorithm
+        distance =   0b00100, // removes points that are further than a given distance
+        duplicates = 0b01000, // removes duplicates
+        origin =     0b10000, // filter origin point
     };
 
     class PCDWrapper {
