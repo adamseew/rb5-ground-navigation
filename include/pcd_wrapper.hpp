@@ -3,6 +3,9 @@
 #include <ros/ros.h>
 #include <vector>
 
+#include <eigen3/Eigen/Dense>
+#include <eigen3/Eigen/Core>
+
 #ifndef YTCG_PCD_WRAPPER_HPP
 #define YTCG_PCD_WRAPPER_HPP
 
@@ -33,6 +36,12 @@ namespace ytcg {
         bool operator<(const Point3D& point) const {
             return x < point.x;
         }
+        Point3D& operator*(const Eigen::Matrix<double, 3, 3>& _matrixxd) {
+            x = x*_matrixxd(0, 0)+y*_matrixxd(0, 1)+z*_matrixxd(0, 2);
+            y = x*_matrixxd(1, 0)+y*_matrixxd(1, 1)+z*_matrixxd(1, 2);
+            z = z*_matrixxd(2, 0)+y*_matrixxd(2, 1)+z*_matrixxd(2, 2);
+            return *this;
+        }
     };
 
     enum Filter { 
@@ -51,13 +60,14 @@ namespace ytcg {
 
     private:
         void timer_callback(const ros::TimerEvent&);
-        void _filter(const Filter, std::vector<Point3D>&);
-        auto _longest_distance(std::vector<Point3D>&);
+        void filter(const Filter, std::vector<Point3D>&);
+        auto longest_distance(std::vector<Point3D>&);
 
         ros::Timer timer_;
         ros::NodeHandle handler_;
         ros::Publisher _publisher;
         ros::Publisher __publisher;
+        Eigen::Matrix<double, 3, 3> rotx, roty, rot;
     };
 }
 

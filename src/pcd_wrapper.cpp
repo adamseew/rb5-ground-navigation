@@ -4,6 +4,7 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/range/adaptors.hpp>
 #include <boost/filesystem.hpp>
+
 #include <functional>
 #include <algorithm>
 #include <stdexcept>
@@ -24,17 +25,27 @@ using std::string;
 using std::vector;
 using std::time_t;
 
+constexpr double pi = std::acos(-1);
+
 PCDWrapper::PCDWrapper(void) {
     timer_ = handler_.createTimer(ros::Duration(PCD_FREQ), std::bind(&PCDWrapper::timer_callback, this, std::placeholders::_1));
     ROS_INFO_STREAM("pointcloud depth wrapper node subscribed to timer, triggering each " << std::to_string(PCD_FREQ) << " secs");
     _publisher  = handler_.advertise<geometry_msgs::Point>(LONGEST_DISTANCE_POINT1_TOPIC, 1);
     __publisher = handler_.advertise<geometry_msgs::Point>(LONGEST_DISTANCE_POINT2_TOPIC, 1);
     ROS_INFO_STREAM("initialized topics " << LONGEST_DISTANCE_POINT1_TOPIC << ", " << LONGEST_DISTANCE_POINT2_TOPIC);
+
+    rotx << cos(pi),    0,               sin(pi),
+            0,          1,               0,
+            -1*sin(pi), 0,               cos(pi);
+    roty << 1,          0,               0,
+            0,          cos(193*pi/180), -1*sin(193*pi/180),
+            0,          sin(193*pi/180), cos(193*pi/180);
+    rot = roty*rotx;
 }
 
 PCDWrapper::~PCDWrapper(void) { } 
 
-auto PCDWrapper::_longest_distance(vector<Point3D>& _pcd) {
+auto PCDWrapper::longest_distance(vector<Point3D>& _pcd) {
 
     int     i         = 1;
     double  distance,
@@ -106,16 +117,17 @@ void PCDWrapper::timer_callback(const ros::TimerEvent& _event) {
     boost::split(__raw_data__, raw_data, boost::is_any_of(","));
 
     pcd.clear();
+    // get the pcd data point by point and perform basic rotations
     for (i = 0; i+2 < __raw_data__.size(); i += 3) // {
         pcd.push_back(Point3D(std::atof(__raw_data__.at(i).c_str()),
                               std::atof(__raw_data__.at(i+1).c_str()),
-                              std::atof(__raw_data__.at(i+2).c_str())));
+                              std::atof(__raw_data__.at(i+2).c_str()))*rot);
         // ROS_INFO_STREAM("pcd data " << i/3 << " is " << pcd.back().x << ", " << pcd.back().y << ", " << pcd.back().z);
-        // }
+        // }    
 
     // filtering the restults, i.e., removing points that are above rocker bogie...
     _size = pcd.size();
-    _filter(Filter::height|Filter::distance|Filter::duplicates, pcd);
+    filter(Filter::height|Filter::distance|Filter::duplicates|Filter::origin, pcd);
     ROS_INFO_STREAM("pcd size before filtering " << _size << ", after " << pcd.size());
 
     // finding the two points with the longest possible distance
@@ -123,7 +135,7 @@ void PCDWrapper::timer_callback(const ros::TimerEvent& _event) {
     //     ROS_WARN("not enough points after filtering to find the logest distance");
     //     return;
     // }
-    auto [distance, ld_point1, ld_point2] = _longest_distance(pcd);
+    auto [distance, ld_point1, ld_point2] = longest_distance(pcd);
     ROS_INFO_STREAM("pcd points with the highest distance (" << distance << "), are " 
                     << ld_point1.x << ", " << ld_point1.y << ", " << ld_point1.z <<  " and "
                     << ld_point2.x << ", " << ld_point2.y << ", " << ld_point2.z
@@ -142,7 +154,7 @@ void PCDWrapper::timer_callback(const ros::TimerEvent& _event) {
 
 }
 
-void PCDWrapper::_filter(const Filter __filter, vector<Point3D>& _pcd) {
+void PCDWrapper::filter(const Filter _filter, vector<Point3D>& _pcd) {
 
     auto lowest_height = [](const auto &point, const auto &point_) {
         return point.y < point_.y;
@@ -163,25 +175,25 @@ void PCDWrapper::_filter(const Filter __filter, vector<Point3D>& _pcd) {
                              ) ||
                    _4_filter*(sqrt(pow(point.x, 2)+pow(point.y, 2)+pow(point.z, 2)) > POINT_MAX_DISTANCE);
         };
-    string string__filter = std::bitset<5>(__filter).to_string();
+    string string_filter = std::bitset<5>(_filter).to_string();
     
-    if (string__filter[4] == '1' || string__filter[2] == '1' || string__filter[0] == '0') {
-        _pcd.erase(std::remove_if(_pcd.begin(), _pcd.end(), [&_0_2_4_filter, &string__filter](Point3D& point) { 
-                                      return _0_2_4_filter(point, string__filter[0] == '1', string__filter[2] == '1', string__filter[4] == '1');
+    if (string_filter[4] == '1' || string_filter[2] == '1' || string_filter[0] == '0') {
+        _pcd.erase(std::remove_if(_pcd.begin(), _pcd.end(), [&_0_2_4_filter, &string_filter](Point3D& point) { 
+                                      return _0_2_4_filter(point, string_filter[0] == '1', string_filter[2] == '1', string_filter[4] == '1');
                                   }
                                  ), _pcd.end()
                   );
-        string__filter[0] = '0';
-        string__filter[2] = '0';
-        string__filter[4] = '0';
+        string_filter[0] = '0';
+        string_filter[2] = '0';
+        string_filter[4] = '0';
     } 
 
-    if (string__filter[1] == '1') {
+    if (string_filter[1] == '1') {
         _pcd.erase(std::unique(_pcd.begin(), _pcd.end()), _pcd.end());
-        string__filter[1] = '0';
+        string_filter[1] = '0';
     }
 
-    if (string__filter != "00000") {
+    if (string_filter != "00000") {
         throw std::logic_error("filter not yet implemented");   
     }
 }
