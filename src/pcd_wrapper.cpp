@@ -34,20 +34,23 @@ PCDWrapper::PCDWrapper(void) {
     __publisher = handler_.advertise<geometry_msgs::Point>(LONGEST_DISTANCE_POINT2_TOPIC, 1);
     ROS_INFO_STREAM("initialized topics " << LONGEST_DISTANCE_POINT1_TOPIC << ", " << LONGEST_DISTANCE_POINT2_TOPIC);
 
-    rotx << cos(pi),    0,               sin(pi),
+    roty << cos(pi),    0,               sin(pi),
             0,          1,               0,
             -1*sin(pi), 0,               cos(pi);
-    roty << 1,          0,               0,
+    rotx << 1,          0,               0,
             0,          cos(193*pi/180), -1*sin(193*pi/180),
             0,          sin(193*pi/180), cos(193*pi/180);
     rot = roty*rotx;
+    
+    ROS_INFO_STREAM("rotation matrix is now initialized; double-check values are consistent");
+    ROS_INFO_STREAM("rot is: " << std::endl << rot);
 }
 
 PCDWrapper::~PCDWrapper(void) { } 
 
 auto PCDWrapper::longest_distance(vector<Point3D>& _pcd) {
 
-    int     i         = 1;
+    int     i         = 2;
     double  distance,
             __distance__;
     
@@ -65,7 +68,7 @@ auto PCDWrapper::longest_distance(vector<Point3D>& _pcd) {
     std::sort(_pcd.begin(), _pcd.end());
     distance = std::abs(_pcd.at(0).x-_pcd.at(1).x);
 
-    for ( ; i+1 < _pcd.size(); i++) {
+    for ( ; i < _pcd.size()-1; i++) {
         __distance__ = std::abs(_pcd.at(i).x-_pcd.at(i+1).x);
         if (__distance__ > distance) {
             ld_point1 = _pcd.at(i);
@@ -118,6 +121,7 @@ void PCDWrapper::timer_callback(const ros::TimerEvent& _event) {
 
     pcd.clear();
     // get the pcd data point by point and perform basic rotations
+    // uncomment parenthesis and ROS_INFO_STREAM for fine debugging
     for (i = 0; i+2 < __raw_data__.size(); i += 3) // {
         pcd.push_back(Point3D(std::atof(__raw_data__.at(i).c_str()),
                               std::atof(__raw_data__.at(i+1).c_str()),
@@ -127,19 +131,23 @@ void PCDWrapper::timer_callback(const ros::TimerEvent& _event) {
 
     // filtering the restults, i.e., removing points that are above rocker bogie...
     _size = pcd.size();
-    filter(Filter::height|Filter::distance|Filter::duplicates|Filter::origin, pcd);
+    filter(Filter::origin|Filter::distance, pcd);
+    filter(Filter::height, pcd);
     ROS_INFO_STREAM("pcd size before filtering " << _size << ", after " << pcd.size());
 
     // finding the two points with the longest possible distance
-    // if (pcd.size() < 2) {
-    //     ROS_WARN("not enough points after filtering to find the logest distance");
-    //     return;
-    // }
+    if (pcd.size() < 2)
+         ROS_INFO("there appear to be no obstacle ahead");
+   
     auto [distance, ld_point1, ld_point2] = longest_distance(pcd);
     ROS_INFO_STREAM("pcd points with the highest distance (" << distance << "), are " 
                     << ld_point1.x << ", " << ld_point1.y << ", " << ld_point1.z <<  " and "
                     << ld_point2.x << ", " << ld_point2.y << ", " << ld_point2.z
                    );
+    
+    if (distance < ROCKER_BOGIE_MIN_WIDTH)
+        ROS_WARN("the distance is too small for rocker-bogie to pass");
+
     auto ros_point = [](Point3D& point) -> geometry_msgs::Point {
         geometry_msgs::Point _ros_point;
         _ros_point.x = point.x;
@@ -161,7 +169,6 @@ void PCDWrapper::filter(const Filter _filter, vector<Point3D>& _pcd) {
     };
 
     double min_height = (*std::min_element(std::begin(_pcd), std::end(_pcd), lowest_height)).y;
-    ROS_INFO_STREAM("min height for filtering: " << min_height);
 
     auto _0_2_4_filter = [&min_height](Point3D& point, bool _0_filter, bool _2_filter, bool _4_filter) -> 
         bool { 
@@ -171,13 +178,17 @@ void PCDWrapper::filter(const Filter _filter, vector<Point3D>& _pcd) {
                              ) ||
                    _2_filter*(
                               point.y > ROCKER_BOGIE_MAX_HEIGHT ||
-                              point.y < min_height+ROCKER_BOGIE_MAX_HEIGHT
+                              point.y < min_height+ROCKER_BOGIE_OBSTACLE_CLEARANCE
                              ) ||
-                   _4_filter*(sqrt(pow(point.x, 2)+pow(point.y, 2)+pow(point.z, 2)) > POINT_MAX_DISTANCE);
+                   _4_filter*(sqrt(point.x*point.x+point.y*point.y+point.z*point.z) > POINT_MAX_DISTANCE);
         };
     string string_filter = std::bitset<5>(_filter).to_string();
     
-    if (string_filter[4] == '1' || string_filter[2] == '1' || string_filter[0] == '0') {
+    if (string_filter[4] == '1' || string_filter[2] == '1' || string_filter[0] == '1') {
+        
+        if (string_filter[2] == '1' && (string_filter[4] == '1' || string_filter[0] == '1'))
+            ROS_WARN("filtering height with distance and/or origin filters is not recommended");
+
         _pcd.erase(std::remove_if(_pcd.begin(), _pcd.end(), [&_0_2_4_filter, &string_filter](Point3D& point) { 
                                       return _0_2_4_filter(point, string_filter[0] == '1', string_filter[2] == '1', string_filter[4] == '1');
                                   }
