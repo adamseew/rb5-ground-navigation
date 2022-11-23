@@ -11,17 +11,17 @@
 
 #define NODE_PCD_WRAPPER                "pointcloud_depth_wrapper"
 #define PCD_FOLDER                      "/home/user"
-#define PCD_FREQ                        1
+#define PCD_FREQ                        .1
 
 #define ROCKER_BOGIE_MAX_HEIGHT         1.3
-#define ROCKER_BOGIE_MIN_WIDTH          0.8
-#define ROCKER_BOGIE_OBSTACLE_CLEARANCE 0.14
+#define ROCKER_BOGIE_MIN_WIDTH          .8
+#define ROCKER_BOGIE_OBSTACLE_CLEARANCE .14
 #define POINT_MAX_DISTANCE              1.2
 
 #define LONGEST_DISTANCE_POINT1_TOPIC   "/pointcloud_depth_wrapper/ld_point1"
 #define LONGEST_DISTANCE_POINT2_TOPIC   "/pointcloud_depth_wrapper/ld_point2"
 
-#define MAX_FOV_REALSENSE_X             0.55
+#define MAX_FOV_REALSENSE_X             .55
 #define MAX_FOV_REALSENSE_Z             1.06653645
 
 
@@ -37,18 +37,18 @@ namespace ytcg {
         bool operator<(const Point3D& point) const {
             return point.x < x;
         }
-        Point3D& operator*(const Eigen::Matrix<double, 3, 3>& _matrixxd) {
-            x = x*_matrixxd(0, 0)+y*_matrixxd(1, 0)+z*_matrixxd(2, 0);
-            y = x*_matrixxd(0, 1)+y*_matrixxd(1, 1)+z*_matrixxd(2, 1);
-            z = z*_matrixxd(0, 2)+y*_matrixxd(1, 2)+z*_matrixxd(2, 2);
+        Point3D& operator*(const Eigen::Matrix<double, 3, 3>& _matrix) {
+            x = x*_matrix(0, 0)+y*_matrix(1, 0)+z*_matrix(2, 0);
+            y = x*_matrix(0, 1)+y*_matrix(1, 1)+z*_matrix(2, 1);
+            z = z*_matrix(0, 2)+y*_matrix(1, 2)+z*_matrix(2, 2);
             return *this;
         }
     };
 
     enum Filter { 
-        height =     0b00100, // filters datapoints that are higher than the robot
-        voxel =      0b00010, // voxel filtering algorithm
         distance =   0b00001, // removes points that are further than a given distance
+        voxel =      0b00010, // voxel filtering algorithm
+        height =     0b00100, // filters datapoints that are higher than the robot
         duplicates = 0b01000, // removes duplicates
         origin =     0b10000, // filter origin point
     };

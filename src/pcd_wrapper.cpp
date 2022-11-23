@@ -27,6 +27,7 @@ using std::time_t;
 
 constexpr double pi = std::acos(-1);
 
+
 PCDWrapper::PCDWrapper(void) {
     timer_ = handler_.createTimer(ros::Duration(PCD_FREQ), std::bind(&PCDWrapper::timer_callback, this, std::placeholders::_1));
     ROS_INFO_STREAM("pointcloud depth wrapper node subscribed to timer, triggering each " << std::to_string(PCD_FREQ) << " secs");
@@ -123,11 +124,11 @@ void PCDWrapper::timer_callback(const ros::TimerEvent& _event) {
     // get the pcd data point by point and perform basic rotations
     // uncomment parenthesis and ROS_INFO_STREAM for fine debugging
     for (i = 0; i+2 < __raw_data__.size(); i += 3) // {
+    //  ROS_INFO_STREAM("pcd data " << i/3 << " is " << pcd.back().x << ", " << pcd.back().y << ", " << pcd.back().z);
         pcd.push_back(Point3D(std::atof(__raw_data__.at(i).c_str()),
                               std::atof(__raw_data__.at(i+1).c_str()),
                               std::atof(__raw_data__.at(i+2).c_str()))*rot);
-        // ROS_INFO_STREAM("pcd data " << i/3 << " is " << pcd.back().x << ", " << pcd.back().y << ", " << pcd.back().z);
-        // }    
+    // }    
 
     // filtering the restults, i.e., removing points that are above rocker bogie...
     _size = pcd.size();
@@ -180,14 +181,17 @@ void PCDWrapper::filter(const Filter _filter, vector<Point3D>& _pcd) {
                               point.y > ROCKER_BOGIE_MAX_HEIGHT ||
                               point.y < min_height+ROCKER_BOGIE_OBSTACLE_CLEARANCE
                              ) ||
-                   _4_filter*(sqrt(point.x*point.x+point.y*point.y+point.z*point.z) > POINT_MAX_DISTANCE);
+                   _4_filter*(sqrt(pow(point.x, 2)+pow(point.y, 2)+pow(point.z, 2)) > POINT_MAX_DISTANCE);
         };
     string string_filter = std::bitset<5>(_filter).to_string();
-    
+
     if (string_filter[4] == '1' || string_filter[2] == '1' || string_filter[0] == '1') {
         
         if (string_filter[2] == '1' && (string_filter[4] == '1' || string_filter[0] == '1'))
             ROS_WARN("filtering height with distance and/or origin filters is not recommended");
+
+	if (string_filter[2] == '1')
+            ROS_INFO_STREAM("min height detected: " << min_height);
 
         _pcd.erase(std::remove_if(_pcd.begin(), _pcd.end(), [&_0_2_4_filter, &string_filter](Point3D& point) { 
                                       return _0_2_4_filter(point, string_filter[0] == '1', string_filter[2] == '1', string_filter[4] == '1');
