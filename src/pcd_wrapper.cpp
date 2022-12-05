@@ -1,6 +1,8 @@
 
 #include "../include/pcd_wrapper.hpp"
 
+#include <sensor_msgs/point_cloud2_iterator.h>
+
 #include <boost/algorithm/string.hpp>
 #include <boost/range/adaptors.hpp>
 #include <boost/filesystem.hpp>
@@ -29,8 +31,10 @@ constexpr double pi = std::acos(-1);
 
 
 PCDWrapper::PCDWrapper(void) {
-    timer_ = handler_.createTimer(ros::Duration(PCD_FREQ), std::bind(&PCDWrapper::timer_callback, this, std::placeholders::_1));
-    ROS_INFO_STREAM("pointcloud depth wrapper node subscribed to timer, triggering each " << std::to_string(PCD_FREQ) << " secs");
+    subscription_ = handler_.subscribe<sensor_msgs::PointCloud2>(ORB_SLAM3_ROS_WRAPPER_PCD_TOPIC, 1000, std::bind(&PCDWrapper::topic_callback, this, std::placeholders::_1));
+    
+
+    ROS_INFO_STREAM("pointcloud depth wrapper node subscribed to topic " << ORB_SLAM3_ROS_WRAPPER_PCD_TOPIC);
     _publisher  = handler_.advertise<geometry_msgs::Point>(LONGEST_DISTANCE_POINT1_TOPIC, 1);
     __publisher = handler_.advertise<geometry_msgs::Point>(LONGEST_DISTANCE_POINT2_TOPIC, 1);
     ROS_INFO_STREAM("initialized topics " << LONGEST_DISTANCE_POINT1_TOPIC << ", " << LONGEST_DISTANCE_POINT2_TOPIC);
@@ -80,7 +84,7 @@ auto PCDWrapper::longest_distance(vector<Point3D>& _pcd) {
     return __return{distance, ld_point1, ld_point2};
 }
 
-void PCDWrapper::timer_callback(const ros::TimerEvent& _event) {
+void PCDWrapper::topic_callback(const sensor_msgs::PointCloud2ConstPtr& _pcd) {
 
     static vector<Point3D> pcd;
     static size_t          _count   = 0;
@@ -88,14 +92,14 @@ void PCDWrapper::timer_callback(const ros::TimerEvent& _event) {
     size_t                 __hash__ = 0,
                            _size;
     int                    i;
-    std::string            line,
-                           raw_data;
 
     if (_count++ == 0) {
         ROS_INFO("callback from timer");
     }
 
+#ifdef DEBUG
     const std::string target_path(PCD_FOLDER);
+    std::string       raw_data;
     vector<string>    entries, __raw_data__;
     
     for (auto &entry : boost::make_iterator_range(directory_iterator(target_path), {})
@@ -106,7 +110,7 @@ void PCDWrapper::timer_callback(const ros::TimerEvent& _event) {
         ) {
         entries.push_back(entry.path().filename().string());
     }
-
+    
     sort(entries.begin(), entries.end());
 
     if ((__hash__ = std::hash<std::string>{}(entries.back())) != _hash) {
@@ -128,7 +132,26 @@ void PCDWrapper::timer_callback(const ros::TimerEvent& _event) {
         pcd.push_back(Point3D(std::atof(__raw_data__.at(i).c_str()),
                               std::atof(__raw_data__.at(i+1).c_str()),
                               std::atof(__raw_data__.at(i+2).c_str()))*rot);
-    // }    
+    // }
+#else
+    sensor_msgs::PointCloud2 __pcd = *_pcd;
+
+    sensor_msgs::PointCloud2Iterator<float> iter_x(__pcd, "x");
+    sensor_msgs::PointCloud2Iterator<float> iter_y(__pcd, "y");
+    sensor_msgs::PointCloud2Iterator<float> iter_z(__pcd, "z");
+
+    int n_points = __pcd.width;
+
+    pcd.clear();
+
+    for(i = 0; i < n_points/3; ++i, ++iter_x, ++iter_y, ++iter_z) {
+        pcd.push_back(Point3D(*iter_x, *iter_y, *iter_z));
+    }
+
+    // for (sensor_msgs::PointCloud2ConstIterator<float> iterator(*_pcd, "x"); iterator != iterator.end(); ++iterator)
+    //     pcd.push_back(Point3D(iterator[0], iterator[1], iterator[2]));
+
+#endif
 
     // filtering the restults, i.e., removing points that are above rocker bogie...
     _size = pcd.size();
