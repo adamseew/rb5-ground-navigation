@@ -12,6 +12,13 @@
 
 topics:
   -
+    topic: /pointcloud_depth_wrapper/min_z
+    type: std_msgs/msg/Float32
+    queue_size: 1
+    qos:
+      history: keep_all
+      durability: transient_local
+  -
     topic: /pointcloud_depth_wrapper/ld_point1 
     type: geometry_msgs/msg/Point  
     queue_size: 1

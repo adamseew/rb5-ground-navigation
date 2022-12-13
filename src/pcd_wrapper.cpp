@@ -2,6 +2,7 @@
 #include "../include/pcd_wrapper.hpp"
 
 #include <sensor_msgs/point_cloud2_iterator.h>
+#include <std_msgs/Float32.h>
 
 #include <boost/algorithm/string.hpp>
 #include <boost/range/adaptors.hpp>
@@ -37,7 +38,8 @@ PCDWrapper::PCDWrapper(void) {
     ROS_INFO_STREAM("pointcloud depth wrapper node subscribed to topic " << ORB_SLAM3_ROS_WRAPPER_PCD_TOPIC);
     _publisher  = handler_.advertise<geometry_msgs::Point>(LONGEST_DISTANCE_POINT1_TOPIC, 1);
     __publisher = handler_.advertise<geometry_msgs::Point>(LONGEST_DISTANCE_POINT2_TOPIC, 1);
-    ROS_INFO_STREAM("initialized topics " << LONGEST_DISTANCE_POINT1_TOPIC << ", " << LONGEST_DISTANCE_POINT2_TOPIC);
+    ___publisher = handler_.advertise<std_msgs::Float32>(MIN_DISTANCE_Z_TOPIC, 1);
+    ROS_INFO_STREAM("initialized topics " << LONGEST_DISTANCE_POINT1_TOPIC << ", " << LONGEST_DISTANCE_POINT2_TOPIC << ", " << MIN_DISTANCE_Z_TOPIC);
 
     roty << cos(pi),    0,               sin(pi),
             0,          1,               0,
@@ -57,7 +59,9 @@ auto PCDWrapper::longest_distance(vector<Point3D>& _pcd) {
 
     int     i         = 2;
     double  distance,
-            __distance__;
+            __distance__,
+            min_z,
+            __min_z__;
     
     _pcd.insert(_pcd.begin(), Point3D(MAX_FOV_REALSENSE_X, 0, MAX_FOV_REALSENSE_Z));
     _pcd.push_back(Point3D(-1*MAX_FOV_REALSENSE_X, 0, MAX_FOV_REALSENSE_Z));
@@ -66,22 +70,26 @@ auto PCDWrapper::longest_distance(vector<Point3D>& _pcd) {
             ld_point2 = _pcd.at(1);
     
     struct __return {         
-        double __1;
-        Point3D __2, __3;
+        double  __1, __2;
+        Point3D __3, __4;
     };
 
     std::sort(_pcd.begin(), _pcd.end());
     distance = std::abs(_pcd.at(0).x-_pcd.at(1).x);
+    min_z = std::min(_pcd.at(0).z, _pcd.at(1).z);
 
     for ( ; i < _pcd.size()-1; i++) {
         __distance__ = std::abs(_pcd.at(i).x-_pcd.at(i+1).x);
+	__min_z__ = std::min(_pcd.at(i).z, _pcd.at(i+1).z);
         if (__distance__ > distance) {
             ld_point1 = _pcd.at(i);
             ld_point2 = _pcd.at(i+1);
             distance = __distance__;
         }
+	if (__min_z__ < min_z)
+            min_z = __min_z__;
     }
-    return __return{distance, ld_point1, ld_point2};
+    return __return{distance, min_z, ld_point1, ld_point2};
 }
 
 void PCDWrapper::topic_callback(const sensor_msgs::PointCloud2ConstPtr& _pcd) {
@@ -144,9 +152,8 @@ void PCDWrapper::topic_callback(const sensor_msgs::PointCloud2ConstPtr& _pcd) {
 
     pcd.clear();
 
-    for(i = 0; i < n_points/3; ++i, ++iter_x, ++iter_y, ++iter_z) {
-        pcd.push_back(Point3D(*iter_x, *iter_y, *iter_z));
-    }
+    for(i = 0; i < n_points/3; ++i, ++iter_x, ++iter_y, ++iter_z)
+        pcd.push_back(Point3D(*iter_x, *iter_y, *iter_z)*rot);
 
     // for (sensor_msgs::PointCloud2ConstIterator<float> iterator(*_pcd, "x"); iterator != iterator.end(); ++iterator)
     //     pcd.push_back(Point3D(iterator[0], iterator[1], iterator[2]));
@@ -163,7 +170,7 @@ void PCDWrapper::topic_callback(const sensor_msgs::PointCloud2ConstPtr& _pcd) {
     if (pcd.size() < 2)
          ROS_INFO("there appear to be no obstacle ahead");
    
-    auto [distance, ld_point1, ld_point2] = longest_distance(pcd);
+    auto [distance, min_z, ld_point1, ld_point2] = longest_distance(pcd);
     ROS_INFO_STREAM("pcd points with the highest distance (" << distance << "), are " 
                     << ld_point1.x << ", " << ld_point1.y << ", " << ld_point1.z <<  " and "
                     << ld_point2.x << ", " << ld_point2.y << ", " << ld_point2.z
@@ -172,16 +179,20 @@ void PCDWrapper::topic_callback(const sensor_msgs::PointCloud2ConstPtr& _pcd) {
     if (distance < ROCKER_BOGIE_MIN_WIDTH)
         ROS_WARN("the distance is too small for rocker-bogie to pass");
 
-    auto ros_point = [](Point3D& point) -> geometry_msgs::Point {
-        geometry_msgs::Point _ros_point;
-        _ros_point.x = point.x;
-        _ros_point.y = point.y;
-        _ros_point.z = point.z;
-        return _ros_point;
+    auto ros_point_pub = [](Point3D& point) -> geometry_msgs::Point {
+        geometry_msgs::Point _ros_point_pub;
+        _ros_point_pub.x = point.x;
+        _ros_point_pub.y = point.y;
+        _ros_point_pub.z = point.z;
+        return _ros_point_pub;
     };
 
-     _publisher.publish(ros_point(ld_point1));
-     __publisher.publish(ros_point(ld_point2));
+    std_msgs::Float32 min_z_pub;
+    min_z_pub.data = min_z;
+
+     _publisher.publish(ros_point_pub(ld_point1));
+     __publisher.publish(ros_point_pub(ld_point2));
+     ___publisher.publish(min_z_pub);
     ROS_INFO("points with highest distance are now published");
 
 }

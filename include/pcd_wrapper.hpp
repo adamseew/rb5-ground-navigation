@@ -14,12 +14,13 @@
 #define PCD_FOLDER                      "/home/user"
 
 #define ROCKER_BOGIE_MAX_HEIGHT         1.3
-#define ROCKER_BOGIE_MIN_WIDTH          .8
+#define ROCKER_BOGIE_MIN_WIDTH          .4
 #define ROCKER_BOGIE_OBSTACLE_CLEARANCE .14
 #define POINT_MAX_DISTANCE              1.2
 
 #define LONGEST_DISTANCE_POINT1_TOPIC   "/pointcloud_depth_wrapper/ld_point1"
 #define LONGEST_DISTANCE_POINT2_TOPIC   "/pointcloud_depth_wrapper/ld_point2"
+#define MIN_DISTANCE_Z_TOPIC            "/pointcloud_depth_wrapper/min_z"
 #define ORB_SLAM3_ROS_WRAPPER_PCD_TOPIC "/orb_slam3_ros_wrapper/pcd"
 
 #define MAX_FOV_REALSENSE_X             .55
@@ -68,7 +69,8 @@ namespace ytcg {
         ros::NodeHandle handler_;
         ros::Publisher _publisher;
         ros::Publisher __publisher;
-	ros::Subscriber subscription_;
+        ros::Publisher ___publisher;
+        ros::Subscriber subscription_;
         Eigen::Matrix<double, 3, 3> rotx, roty, rot;
     };
 }
