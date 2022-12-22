@@ -23,8 +23,8 @@
 #define MIN_DISTANCE_Z_TOPIC            "/pointcloud_depth_wrapper/min_z"
 #define ORB_SLAM3_ROS_WRAPPER_PCD_TOPIC "/orb_slam3_ros_wrapper/pcd"
 
-#define MAX_FOV_REALSENSE_X             .55
-#define MAX_FOV_REALSENSE_Z             1.06653645
+#define MAX_FOV_REALSENSE_X             .8
+#define MAX_FOV_REALSENSE_Z             .894427191
 
 
 namespace ytcg {
@@ -43,6 +43,12 @@ namespace ytcg {
             x = x*_matrix(0, 0)+y*_matrix(1, 0)+z*_matrix(2, 0);
             y = x*_matrix(0, 1)+y*_matrix(1, 1)+z*_matrix(2, 1);
             z = z*_matrix(0, 2)+y*_matrix(1, 2)+z*_matrix(2, 2);
+            return *this;
+        }
+        Point3D& operator=(const Point3D& point) {
+            x = point.x;
+            y = point.y;
+            z = point.z;
             return *this;
         }
     };

@@ -57,7 +57,10 @@ PCDWrapper::~PCDWrapper(void) { }
 
 auto PCDWrapper::longest_distance(vector<Point3D>& _pcd) {
 
-    int     i         = 2;
+    ROS_INFO_STREAM("debug 0 pcd size " << _pcd.size());
+
+    int     i            = 2,
+            j            = 0;
     double  distance,
             __distance__,
             min_z,
@@ -65,9 +68,6 @@ auto PCDWrapper::longest_distance(vector<Point3D>& _pcd) {
     
     _pcd.insert(_pcd.begin(), Point3D(MAX_FOV_REALSENSE_X, 0, MAX_FOV_REALSENSE_Z));
     _pcd.push_back(Point3D(-1*MAX_FOV_REALSENSE_X, 0, MAX_FOV_REALSENSE_Z));
-
-    Point3D ld_point1 = _pcd.at(0),
-            ld_point2 = _pcd.at(1);
     
     struct __return {         
         double  __1, __2;
@@ -78,6 +78,12 @@ auto PCDWrapper::longest_distance(vector<Point3D>& _pcd) {
     distance = std::abs(_pcd.at(0).x-_pcd.at(1).x);
     min_z = std::min(_pcd.at(0).z, _pcd.at(1).z);
 
+    Point3D ld_point1 = _pcd.at(0),
+            ld_point2 = _pcd.at(1);
+    
+    ROS_INFO_STREAM("debug 1 point pcd at index 0 (" << _pcd.at(0).x << ", " << _pcd.at(0).y << ", " << _pcd.at(0).z << ")");
+    ROS_INFO_STREAM("debug 2 point pcd at index 1 (" << _pcd.at(1).x << ", " << _pcd.at(1).y << ", " << _pcd.at(1).z << ")");
+
     for ( ; i < _pcd.size()-1; i++) {
         __distance__ = std::abs(_pcd.at(i).x-_pcd.at(i+1).x);
 	__min_z__ = std::min(_pcd.at(i).z, _pcd.at(i+1).z);
@@ -85,16 +91,25 @@ auto PCDWrapper::longest_distance(vector<Point3D>& _pcd) {
             ld_point1 = _pcd.at(i);
             ld_point2 = _pcd.at(i+1);
             distance = __distance__;
+	    j = i;
+            ROS_INFO_STREAM("debug 3 point pcd at index " << j << ", i is " << i << " (" << _pcd.at(j).x << ", " << _pcd.at(j).y << ", " << _pcd.at(j).z << ")");
+            ROS_INFO_STREAM("debug 4 point pcd at index " << j+1 << " (" << _pcd.at(j+1).x << ", " << _pcd.at(j+1).y << ", " << _pcd.at(j+1).z << ")");
+
         }
 	if (__min_z__ < min_z)
             min_z = __min_z__;
     }
+    ROS_INFO_STREAM("debug 5 point ld_point1 (" << ld_point1.x << ", " << ld_point1.y << ", " << ld_point1.z << ")");
+    ROS_INFO_STREAM("debug 6 point ld_point2 (" << ld_point2.x << ", " << ld_point2.y << ", " << ld_point2.z << ")");
+    ROS_INFO_STREAM("debug 7 point pcd at index " << j << " (" << _pcd.at(j).x << ", " << _pcd.at(j).y << ", " << _pcd.at(j).z << ")");
+    ROS_INFO_STREAM("debug 8 point pcd at index " << j+1 << " (" << _pcd.at(j+1).x << ", " << _pcd.at(j+1).y << ", " << _pcd.at(j+1).z << ")");
+    ROS_INFO_STREAM("debug 9 pcd size " << _pcd.size());
     return __return{distance, min_z, ld_point1, ld_point2};
 }
 
 void PCDWrapper::topic_callback(const sensor_msgs::PointCloud2ConstPtr& _pcd) {
 
-    static vector<Point3D> pcd;
+    vector<Point3D> pcd;
     static size_t          _count   = 0;
     static size_t          _hash    = 0;
     size_t                 __hash__ = 0,
