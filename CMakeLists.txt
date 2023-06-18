@@ -1,6 +1,6 @@
 
 cmake_minimum_required(VERSION 2.8)
-project(ytcg_ground-nav)
+project(rb5-ground-nav)
 
 find_package(catkin REQUIRED COMPONENTS
   roscpp

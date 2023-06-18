@@ -1,4 +1,5 @@
 
+#
 # use  configuration to  export the two points
 # where the gap is, i.e.,  the two points with
 # the longest distance from point cloud depth,
@@ -9,6 +10,7 @@
 # before:
 #   ros2 run ros1_bridge param_bridge
 #
+
 
 topics:
   -
