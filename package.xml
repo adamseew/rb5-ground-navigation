@@ -2,7 +2,7 @@
 <package format="2">
   <name>rb5-ground-nav</name>
   <version>1.0.0</version>
-  <description>RB5 ground-navigation ROS package that  package collects point clouds from an RGB-D camera and other data from the SLAM algorithm and ports them into ROS2.</description>
+  <description>RB5 ground-navigation ROS package that collects point clouds from an RGB-D camera and other data from the SLAM algorithm and ports them into ROS2.</description>
   <maintainer email="adam.seewald@yale.edu">Adam Seewald</maintainer>
   <license>CC BY-NC-SA</license>
 
